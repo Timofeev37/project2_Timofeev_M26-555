@@ -10,8 +10,8 @@ def create_table(metadata, table_name, columns):  # создание табли�
 
     table_columns = {"ID": "int"}
     for column in columns:
+        # partition устойчив к пустому/лишнему ":" в отличие от split
         column_name, _, column_type = column.partition(":")
-        #разделение через partition для более аккуратной разметки пользовательских данных
         if column_type not in VALID_TYPES: #проверка типов данных для столбцов
             print(f"Некорректное значение: {column_type}. Попробуйте снова.")
             return metadata

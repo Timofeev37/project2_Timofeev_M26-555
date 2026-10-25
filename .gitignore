@@ -1,4 +1,5 @@
 .venv
 dist/
-__pychache__/
-*.egg_info
+__pycache__/
+*.egg-info
+db_metadata.json

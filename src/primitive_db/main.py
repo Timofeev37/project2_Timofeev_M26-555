@@ -5,6 +5,6 @@ from . import engine
 
 def main():
     print("DB project is running!")
-    engine.main()
+    engine.run()
 if __name__ == "__main__":
     main()
