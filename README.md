@@ -1,4 +1,4 @@
-# primitive-db
+# Примитивная база данных primitive-db
 
 Консольное приложение, имитирующее работу с базой данных: позволяет создавать
 и удалять таблицы с типизированными столбцами, хранит структуру таблиц в
@@ -17,19 +17,4 @@ JSON-файле на диске.
 - `exit` — выйти из программы.
 
 ### Пример использования
-
-```
-Введите команду: create_table users name:str age:int is_active:bool
-Таблица "users" успешно создана со столбцами: ID:int, name:str, age:int, is_active:bool
-Введите команду: list_tables
--   users
-Введите команду: create_table users name:str
-Ошибка: Таблица "users" уже существует.
-Введите команду: drop_table users
-Таблица "users" успешно удалена.
-Введите команду: drop_table products
-Ошибка: Таблица "products" не существует.
-Введите команду: create_table products name:list
-Некорректное значение: list. Попробуйте снова.
-Введите команду: exit
-```
+Ссылка на запись asciinema: https://asciinema.org/a/vsEk1O5CMR02o9li
