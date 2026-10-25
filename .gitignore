@@ -1,0 +1,4 @@
+.venv
+dist/
+__pychache__/
+*.egg_info
