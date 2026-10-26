@@ -22,14 +22,19 @@ def print_help():
 
     print("\n***Процесс работы с дыннами***")
     print("Функции:")
-    print("<command> insert - вставить данные")
+    print("<command> insert into <имя_таблицы> values (<значение1>, <значение2>, ...) - создать запись.")
+    print("<command> select from <имя_таблицы> where <столбец> = <значение> - прочитать записи по условию.")
+    print("<command> select from <имя_таблицы> - прочитать все записи.")
+    print("<command> update <имя_таблицы> set <столбец1> = <новое_значение1> where <столбец_условия> = <значение_условия> - обновить запись.")
+    print("<command> delete from <имя_таблицы> where <столбец> = <значение> - удалить запись.")
+    print("<command> info <имя_таблицы> - вывести информацию о таблице.")
 
     print("\nОбщие команды:")
     print("<command> exit - выход из программы")
     print("<command> help - справочная информация\n")
 
 def run():
-    command_list = ["help", "exit", "create_table", "drop_table", "list_tables", "insert", "select", "update", "delete"]
+    command_list = ["help", "exit", "create_table", "drop_table", "list_tables", "insert", "select", "update", "delete", "info"]
 
     print('Первая попытка запустить проект!')
     print('Загрузка таблиц...')
@@ -83,7 +88,10 @@ def run():
             case 'insert':
                 try:
                     table = args[2]
-                    values_raw = args[4:]
+                    # снимаем скобки "(" ")" и запятые, которые shlex не режет
+                    # как отдельные разделители (например, токен "28,")
+                    values_raw = [token.strip('(),') for token in args[4:]]
+                    values_raw = [token for token in values_raw if token]
                     values = []
                     try:
                         for value in values_raw:
@@ -195,6 +203,23 @@ def run():
                     print(' успешно удалены')
                 save_table_data(table,table_data)
 
+            case 'info':
+                try:
+                    table = args[1]
+                except IndexError:
+                    print('Неправильный формат команды')
+                    continue
+                if table not in metadata:  # проверка существования таблицы
+                    print(f'Ошибка: Таблицы "{table}" не существует.')
+                    continue
+                table_data = load_table_data(table)
+                table_columns = metadata[table]  # запись новой таблицы в metadata
+                columns_str = ", ".join(
+                    f"{name}:{col_type}" for name, col_type in table_columns.items()
+                )
+                print(f'Таблица: "{table}')
+                print(f'Столбцы: {columns_str}')
+                print(f'Количество записей: {len(table_data)}')
 
 if __name__ == '__main__':
     run()
