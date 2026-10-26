@@ -2,8 +2,13 @@ import shlex
 
 import prompt
 
-from .core import create_table, drop_table
-from .utils import load_metadata, save_metadata
+from .core import create_table, drop_table, insert, select, update, delete
+from .utils import load_metadata, save_metadata, load_table_data, save_table_data
+
+from .parser import parse_value, parse_condition
+
+from pathlib import Path
+from prettytable import PrettyTable
 
 
 def print_help():
@@ -15,16 +20,21 @@ def print_help():
     print("<command> list_tables - показать список всех таблиц")
     print("<command> drop_table <имя_таблицы> - удалить таблицу")
 
+    print("\n***Процесс работы с дыннами***")
+    print("Функции:")
+    print("<command> insert - вставить данные")
+
     print("\nОбщие команды:")
     print("<command> exit - выход из программы")
     print("<command> help - справочная информация\n")
 
 def run():
-    command_list = ["help", "exit", "create_table", "drop_table", "list_tables"]
+    command_list = ["help", "exit", "create_table", "drop_table", "list_tables", "insert", "select", "update", "delete"]
 
     print('Первая попытка запустить проект!')
     print('Загрузка таблиц...')
-    filepath = 'db_metadata.json'
+
+    filepath = Path(__file__).parent / 'db_metadata.json'
     metadata = load_metadata(filepath)
     print_help()
     while True:
@@ -68,6 +78,123 @@ def run():
                         print(f'-   {tables}')
                 else:
                     print ('Таблиц нет')
+
+
+            case 'insert':
+                try:
+                    table = args[2]
+                    values_raw = args[4:]
+                    values = []
+                    try:
+                        for value in values_raw:
+                            values.append( parse_value(value))
+                    except ValueError:
+                        print('Ошибка при вводе значений!')
+                        continue
+                    print(values)
+                    insert(metadata,table,values)
+                except IndexError:
+                    print('Неправильный формат команды')
+                    continue
+
+            case 'select':
+                try:
+                    if args[1] != 'from':
+                        raise IndexError
+                    table = args[2]
+                except IndexError:
+                    print('Неправильный формат команды')
+                    continue
+
+                if table not in metadata:  # проверка существования таблицы
+                    print(f'Ошибка: Таблицы "{table}" не существует.')
+                    continue
+
+                clause_tokens = args[4:]  # то, что после слова "where"
+                where_clause = None
+                if clause_tokens:
+                    try:
+                        where_clause = parse_condition(clause_tokens)
+                    except ValueError:
+                        print('Можно задать только 1 условие!')
+                        continue
+
+                table_data = load_table_data(table)  # загружаем данные таблицы
+                result = select(table_data, where_clause=where_clause)
+
+                columns = list(metadata[table].keys())
+                pretty = PrettyTable()
+                pretty.field_names = columns
+                for record in result:
+                    pretty.add_row([record[column] for column in columns])
+                print(pretty)
+
+            case 'update':
+                try:
+                    table = args[1]
+                except IndexError:
+                    print('Неправильный формат команды')
+                    continue
+
+                if table not in metadata:  # проверка существования таблицы
+                    print(f'Ошибка: Таблицы "{table}" не существует.')
+                    continue
+
+                try:
+                    set_clause = parse_condition(args[3:6])
+                except ValueError:
+                    print('Ошибка в указании обновленных данных')
+                    continue
+                try:
+                    where_clause = parse_condition(args[7:])
+                except ValueError:
+                    print('Ошибка в указании условий обновления')
+                    continue
+
+                table_data = load_table_data(table)  # загружаем данные таблицы
+                ids, table_data = update(table_data, set_clause, where_clause)
+                if not ids:
+                    print('Ни одной записи не обновлено')
+                elif len(ids) == 1:
+                    print(f'Запись с ID={ids[0]} успешно обновлена')
+                else:
+                    print(f'Записи с ID=',end='')
+                    for i, id in enumerate(ids):
+                        print(f'{id}' if i == 0 else f', {id}', end='')
+                    print(' успешно обновлены')
+                save_table_data(table,table_data)
+
+            case 'delete':
+                try:
+                    table = args[2]
+                except IndexError:
+                    print('Неправильный формат команды')
+                    continue
+
+                if table not in metadata:  # проверка существования таблицы
+                    print(f'Ошибка: Таблицы "{table}" не существует.')
+                    continue
+
+                clause_raw = args[4:]
+                try:
+                    clause = parse_condition(clause_raw)
+                except ValueError:
+                    print('Можно задать только 1 условие!')
+                    continue
+
+                table_data = load_table_data(table)
+                ids, table_data = delete(table_data, clause)
+                if not ids:
+                    print('Ни одна запись не была удалена')
+                elif len(ids) == 1:
+                    print(f'Запись с ID={ids[0]} успешно удалена')
+                else:
+                    print(f'Записи с ID=',end='')
+                    for i,id in enumerate(ids):
+                        print(f'{id}'if i==0 else f', {id}',end='')
+                    print(' успешно удалены')
+                save_table_data(table,table_data)
+
 
 if __name__ == '__main__':
     run()

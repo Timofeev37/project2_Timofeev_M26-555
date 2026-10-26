@@ -2,6 +2,7 @@
 from .utils import load_table_data, save_table_data
 
 
+
 VALID_TYPES = {"int", "str", "bool"}
 
 type_mapping = {
@@ -85,20 +86,28 @@ def update(table_data, set_clause, where_clause): # обновление зап�
         return table_data
 
     updated_data = []
+    ids = []
     for record in table_data: # для каждой записи проверяем соответствие условию where_clause
         if all(record.get(column) == value for column, value in where_clause.items()):
+
             record.update(set_clause) #обновляем в соответствии set_clause
-        updated_data.append(record)
-    return updated_data
+
+            ids.append(record.get("ID"))
+            updated_data.append(record)
+        else:
+            updated_data.append(record)
+    return ids, updated_data
 
 
 def delete(table_data, where_clause): # удаление записей из таблицы
     if where_clause is None:
         return table_data
     updated_data = table_data.copy()
+    ids = []
     for record in table_data: # для каждой записи проверяем соответствие условию where_clause
         if all(record.get(column) == value for column, value in where_clause.items()):
+            ids.append(record.get("ID"))
             updated_data.remove(record) # удаляем соответствующие
 
-    return updated_data
+    return ids, updated_data
 
