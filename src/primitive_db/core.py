@@ -1,18 +1,13 @@
 # для работы с таблицами и данными
+from .constants import TYPE_MAPPING, VALID_TYPES
 from .decorators import confirm_action, create_cacher, handle_db_errors, log_time
 from .utils import load_table_data, save_table_data
 
-VALID_TYPES = {"int", "str", "bool"}
-
 _cache_select, invalidate_select_cache = create_cacher()
 
-type_mapping = {
-    "int": int,
-    "str": str,
-    "bool": bool}
-
 @handle_db_errors
-def create_table(metadata, table_name, columns):  # создание таблицы
+def create_table(metadata, table_name, columns):
+    """Создаёт таблицу table_name со столбцами columns (+ автo ID:int)."""
     if table_name in metadata: #проверка существования таблицы
         print(f'Ошибка: Таблица "{table_name}" уже существует.')
         return metadata
@@ -35,7 +30,8 @@ def create_table(metadata, table_name, columns):  # создание табли�
 
 @confirm_action("удаление таблицы")
 @handle_db_errors
-def drop_table(metadata, table_name):  # удаление таблицы
+def drop_table(metadata, table_name):
+    """Удаляет таблицу table_name из metadata (с подтверждением)."""
     if table_name not in metadata: #проверка существования таблицы
         print(f'Ошибка: Таблица "{table_name}" не существует.')
         return metadata
@@ -47,7 +43,8 @@ def drop_table(metadata, table_name):  # удаление таблицы
 
 @handle_db_errors
 @log_time
-def insert(metadata, table_name, values):  # создание записи
+def insert(metadata, table_name, values):
+    """Добавляет запись values в table_name с автогенерацией ID."""
     if table_name not in metadata:  # проверка существования таблицы
         print(f'Ошибка: Таблицы "{table_name}" не существует.')
         return None
@@ -61,7 +58,7 @@ def insert(metadata, table_name, values):  # создание записи
         return None
 
     # нужные типы для проверки
-    types = [type_mapping[metadata[table_name][column]] for column in columns]
+    types = [TYPE_MAPPING[metadata[table_name][column]] for column in columns]
     if not all(isinstance(value, expected) for value, expected in zip(values, types)):
         print("Ошибка: неверный тип одного из значений.")
         return None
@@ -81,8 +78,10 @@ def insert(metadata, table_name, values):  # создание записи
 
 @handle_db_errors
 @log_time
-def select(table_data, where_clause=None, table_name=None):  # чтение записей
+def select(table_data, where_clause=None, table_name=None):
+    """Возвращает записи table_data, подходящие под where_clause (с кэшем)."""
     def compute():
+        """Реально вычисляет отфильтрованный результат (для кэша)."""
         if where_clause is None:
             return table_data
         return [
@@ -101,7 +100,8 @@ def select(table_data, where_clause=None, table_name=None):  # чтение за
     return _cache_select(cache_key, compute)
 
 @handle_db_errors
-def update(table_data, set_clause, where_clause): # обновление записей в таблице
+def update(table_data, set_clause, where_clause):
+    """Обновляет записи, подходящие под where_clause, согласно set_clause."""
     if where_clause is None:
         return table_data
 
@@ -120,7 +120,8 @@ def update(table_data, set_clause, where_clause): # обновление зап�
 
 @confirm_action("удаление строки")
 @handle_db_errors
-def delete(table_data, where_clause): # удаление записей из таблицы
+def delete(table_data, where_clause):
+    """Удаляет записи, подходящие под where_clause (с подтверждением)."""
     if where_clause is None:
         return table_data
     updated_data = table_data.copy()

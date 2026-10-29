@@ -1,9 +1,9 @@
 import shlex
-from pathlib import Path
 
 import prompt
 from prettytable import PrettyTable
 
+from .constants import COMMANDS, META_FILE
 from .core import (
     create_table,
     delete,
@@ -52,14 +52,12 @@ def print_help():
     print("<command> help - справочная информация\n")
 
 def run():
-    command_list = [
-        "help", "exit", "create_table", "drop_table", "list_tables",
-        "insert", "select", "update", "delete", "info",
-    ]
+    """Главный цикл: читает команды пользователя и вызывает функции core."""
+    command_list = COMMANDS
     print('Первая попытка запустить проект!')
     print('Загрузка таблиц...')
 
-    filepath = Path(__file__).parent / 'db_metadata.json'
+    filepath = META_FILE
     metadata = load_metadata(filepath)
     print_help()
     while True:
