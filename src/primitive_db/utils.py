@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 
+
 def load_metadata(filepath):  # для загрузки данных из JSON
     try:
         with open(filepath, encoding="utf-8") as file:

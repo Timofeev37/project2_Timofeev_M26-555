@@ -1,14 +1,20 @@
 import shlex
+from pathlib import Path
 
 import prompt
-
-from .core import create_table, drop_table, insert, select, update, delete
-from .utils import load_metadata, save_metadata, load_table_data, save_table_data
-
-from .parser import parse_value, parse_condition
-
-from pathlib import Path
 from prettytable import PrettyTable
+
+from .core import (
+    create_table,
+    delete,
+    drop_table,
+    insert,
+    invalidate_select_cache,
+    select,
+    update,
+)
+from .parser import parse_condition, parse_value
+from .utils import load_metadata, load_table_data, save_metadata, save_table_data
 
 
 def print_help():
@@ -22,11 +28,23 @@ def print_help():
 
     print("\n***Процесс работы с дыннами***")
     print("Функции:")
-    print("<command> insert into <имя_таблицы> values (<значение1>, <значение2>, ...) - создать запись.")
-    print("<command> select from <имя_таблицы> where <столбец> = <значение> - прочитать записи по условию.")
+    print(
+        "<command> insert into <имя_таблицы> values "
+        "(<значение1>, <значение2>, ...) - создать запись."
+    )
+    print(
+        "<command> select from <имя_таблицы> where <столбец> = <значение> "
+        "- прочитать записи по условию."
+    )
     print("<command> select from <имя_таблицы> - прочитать все записи.")
-    print("<command> update <имя_таблицы> set <столбец1> = <новое_значение1> where <столбец_условия> = <значение_условия> - обновить запись.")
-    print("<command> delete from <имя_таблицы> where <столбец> = <значение> - удалить запись.")
+    print(
+        "<command> update <имя_таблицы> set <столбец1> = <новое_значение1> "
+        "where <столбец_условия> = <значение_условия> - обновить запись."
+    )
+    print(
+        "<command> delete from <имя_таблицы> where <столбец> = <значение> "
+        "- удалить запись."
+    )
     print("<command> info <имя_таблицы> - вывести информацию о таблице.")
 
     print("\nОбщие команды:")
@@ -34,8 +52,10 @@ def print_help():
     print("<command> help - справочная информация\n")
 
 def run():
-    command_list = ["help", "exit", "create_table", "drop_table", "list_tables", "insert", "select", "update", "delete", "info"]
-
+    command_list = [
+        "help", "exit", "create_table", "drop_table", "list_tables",
+        "insert", "select", "update", "delete", "info",
+    ]
     print('Первая попытка запустить проект!')
     print('Загрузка таблиц...')
 
@@ -71,7 +91,10 @@ def run():
                     if len(args) > 2:
                         raise IndexError
                     table = args[1]
-                    metadata = drop_table(metadata,table)
+                    result = drop_table(metadata,table)
+                    if result is None:  # пользователь отказался от подтверждения
+                        continue
+                    metadata = result
                     save_metadata(filepath, metadata)
                 except IndexError:
                     print('Неправильный формат команды')
@@ -128,7 +151,8 @@ def run():
                         continue
 
                 table_data = load_table_data(table)  # загружаем данные таблицы
-                result = select(table_data, where_clause=where_clause)
+
+                result = select(table_data, where_clause=where_clause, table_name=table)
 
                 columns = list(metadata[table].keys())
                 pretty = PrettyTable()
@@ -166,11 +190,12 @@ def run():
                 elif len(ids) == 1:
                     print(f'Запись с ID={ids[0]} успешно обновлена')
                 else:
-                    print(f'Записи с ID=',end='')
+                    print('Записи с ID=',end='')
                     for i, id in enumerate(ids):
                         print(f'{id}' if i == 0 else f', {id}', end='')
                     print(' успешно обновлены')
                 save_table_data(table,table_data)
+                invalidate_select_cache(table)
 
             case 'delete':
                 try:
@@ -191,17 +216,21 @@ def run():
                     continue
 
                 table_data = load_table_data(table)
-                ids, table_data = delete(table_data, clause)
+                result = delete(table_data, clause)
+                if result is None:  # пользователь отказался от подтверждения
+                    continue
+                ids, table_data = result
                 if not ids:
                     print('Ни одна запись не была удалена')
                 elif len(ids) == 1:
                     print(f'Запись с ID={ids[0]} успешно удалена')
                 else:
-                    print(f'Записи с ID=',end='')
+                    print('Записи с ID=',end='')
                     for i,id in enumerate(ids):
                         print(f'{id}'if i==0 else f', {id}',end='')
                     print(' успешно удалены')
                 save_table_data(table,table_data)
+                invalidate_select_cache(table)
 
             case 'info':
                 try:
@@ -217,9 +246,11 @@ def run():
                 columns_str = ", ".join(
                     f"{name}:{col_type}" for name, col_type in table_columns.items()
                 )
-                print(f'Таблица: "{table}')
+                print(f'Таблица: {table}')
                 print(f'Столбцы: {columns_str}')
                 print(f'Количество записей: {len(table_data)}')
+
+
 
 if __name__ == '__main__':
     run()

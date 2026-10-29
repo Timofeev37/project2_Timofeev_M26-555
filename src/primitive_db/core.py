@@ -1,15 +1,17 @@
 # для работы с таблицами и данными
+from .decorators import confirm_action, create_cacher, handle_db_errors, log_time
 from .utils import load_table_data, save_table_data
 
-
-
 VALID_TYPES = {"int", "str", "bool"}
+
+_cache_select, invalidate_select_cache = create_cacher()
 
 type_mapping = {
     "int": int,
     "str": str,
     "bool": bool}
 
+@handle_db_errors
 def create_table(metadata, table_name, columns):  # создание таблицы
     if table_name in metadata: #проверка существования таблицы
         print(f'Ошибка: Таблица "{table_name}" уже существует.')
@@ -31,7 +33,8 @@ def create_table(metadata, table_name, columns):  # создание табли�
     print(f'Таблица "{table_name}" успешно создана со столбцами: {columns_str}')
     return metadata
 
-
+@confirm_action("удаление таблицы")
+@handle_db_errors
 def drop_table(metadata, table_name):  # удаление таблицы
     if table_name not in metadata: #проверка существования таблицы
         print(f'Ошибка: Таблица "{table_name}" не существует.')
@@ -41,56 +44,73 @@ def drop_table(metadata, table_name):  # удаление таблицы
     print(f'Таблица "{table_name}" успешно удалена.')
     return metadata
 
+
+@handle_db_errors
+@log_time
 def insert(metadata, table_name, values):  # создание записи
     if table_name not in metadata:  # проверка существования таблицы
         print(f'Ошибка: Таблицы "{table_name}" не существует.')
         return None
 
     columns = list(metadata[table_name].keys())[1:]  # без ID
-    if len(values) != len(columns): # проверяем количество значений в таблице и значений values
+    if len(values) != len(columns):  # сверяем кол-во значений и столбцов
         print(
             f'Ошибка: таблица "{table_name}" ожидает {len(columns)} '
             f"значений, получено {len(values)}."
         )
         return None
 
-    types = [type_mapping[metadata[table_name][column]] for column in columns] # получаем необходимые типы данных
-    if not all(isinstance(value, expected) for value, expected in zip(values, types)): # проверяем совпадение типов
+    # нужные типы для проверки
+    types = [type_mapping[metadata[table_name][column]] for column in columns]
+    if not all(isinstance(value, expected) for value, expected in zip(values, types)):
         print("Ошибка: неверный тип одного из значений.")
         return None
 
-    data = load_table_data(table_name) #загружаем данные таблицы
-    new_id = max((record["ID"] for record in data), default=0) + 1 #получаем акутальный ID
+    data = load_table_data(table_name)  # загружаем данные таблицы
+    new_id = max((record["ID"] for record in data), default=0) + 1  # новый ID
 
-    record = {"ID": new_id} # назначаем ID
-    record.update(zip(columns, values)) # обновляем пары ключ-значение для заполнения в таблицу
-    data.append(record) # добавляем в данные для записи
+    record = {"ID": new_id}  # назначаем ID
+    record.update(zip(columns, values))  # заполняем остальные поля
+    data.append(record)  # добавляем в данные для записи
 
     save_table_data(table_name, data) # сохраняем в таблицу
+    invalidate_select_cache(table_name)  # старые закэшированные select устарели
     print(f'Запись с ID={new_id} успешно добавлена в таблицу "{table_name}".')
     return data
 
 
-def select(table_data, where_clause=None):  # чтение записей
-    if where_clause is None:
-        return table_data
+@handle_db_errors
+@log_time
+def select(table_data, where_clause=None, table_name=None):  # чтение записей
+    def compute():
+        if where_clause is None:
+            return table_data
+        return [
+            record
+            for record in table_data
+            if all(
+                record.get(column) == value
+                for column, value in where_clause.items()
+            )
+        ]
 
-    return [
-        record
-        for record in table_data
-        if all(record.get(column) == value for column, value in where_clause.items())
-    ] # генераторный список, проверяющий каждую запись на соответствие условию where_clause
+    if table_name is None:  # без имени таблицы кэшировать небезопасно
+        return compute()
 
+    cache_key = (table_name, frozenset(where_clause.items()) if where_clause else None)
+    return _cache_select(cache_key, compute)
+
+@handle_db_errors
 def update(table_data, set_clause, where_clause): # обновление записей в таблице
     if where_clause is None:
         return table_data
 
     updated_data = []
     ids = []
-    for record in table_data: # для каждой записи проверяем соответствие условию where_clause
+    for record in table_data:  # проверяем соответствие условию where_clause
         if all(record.get(column) == value for column, value in where_clause.items()):
 
-            record.update(set_clause) #обновляем в соответствии set_clause
+            record.update(set_clause)  # обновляем в соответствии с set_clause
 
             ids.append(record.get("ID"))
             updated_data.append(record)
@@ -98,16 +118,17 @@ def update(table_data, set_clause, where_clause): # обновление зап�
             updated_data.append(record)
     return ids, updated_data
 
-
+@confirm_action("удаление строки")
+@handle_db_errors
 def delete(table_data, where_clause): # удаление записей из таблицы
     if where_clause is None:
         return table_data
     updated_data = table_data.copy()
     ids = []
-    for record in table_data: # для каждой записи проверяем соответствие условию where_clause
+    for record in table_data:  # проверяем соответствие условию where_clause
         if all(record.get(column) == value for column, value in where_clause.items()):
             ids.append(record.get("ID"))
-            updated_data.remove(record) # удаляем соответствующие
+            updated_data.remove(record)  # удаляем соответствующие
 
     return ids, updated_data
 
